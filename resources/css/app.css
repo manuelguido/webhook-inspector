@@ -2,10 +2,163 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../js/**/*.{vue,ts}';
 
 @theme inline {
     --font-sans:
         Instrument Sans, ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    --font-mono:
+        'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        'Liberation Mono', monospace;
+}
+
+:root {
+    color-scheme: dark;
+    --inspector-bg: #090d12;
+    --inspector-bg-2: #0f151e;
+    --inspector-panel: #141b25;
+    --inspector-panel-2: #192332;
+    --inspector-panel-3: #223045;
+    --inspector-border: rgba(181, 197, 219, 0.12);
+    --inspector-border-strong: rgba(181, 197, 219, 0.2);
+    --inspector-fg: #eef4fb;
+    --inspector-muted: #9ba8ba;
+    --inspector-faint: #647085;
+    --inspector-accent: #7dd3fc;
+    --inspector-accent-soft: rgba(125, 211, 252, 0.13);
+    --inspector-green: #67e8a5;
+    --inspector-amber: #f4c676;
+    --inspector-red: #fb8f8f;
+    --inspector-purple: #c4b5fd;
+}
+
+html,
+body,
+#app {
+    min-height: 100%;
+}
+
+html,
+body {
+    background: var(--inspector-bg);
+    color: var(--inspector-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    min-width: 320px;
+    overflow-x: hidden;
+}
+
+::selection {
+    background: var(--inspector-accent-soft);
+    color: var(--inspector-fg);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+    background: var(--inspector-panel-3);
+    background-clip: content-box;
+}
+
+.inspector-panel {
+    border: 1px solid var(--inspector-border);
+    background: var(--inspector-panel);
+    border-radius: 8px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.025) inset,
+        0 18px 48px -34px rgba(0, 0, 0, 0.82);
+}
+
+.inspector-panel-header {
+    border-bottom: 1px solid var(--inspector-border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.inspector-focus:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 1px var(--inspector-accent),
+        0 0 0 4px var(--inspector-accent-soft);
+}
+
+.inspector-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    border-radius: 6px;
+    border: 1px solid var(--inspector-border);
+    padding: 0.35rem 0.75rem;
+    color: var(--inspector-muted);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+    white-space: nowrap;
+}
+
+.inspector-btn:hover:not(:disabled) {
+    border-color: var(--inspector-border-strong);
+    background: var(--inspector-panel-2);
+    color: var(--inspector-fg);
+}
+
+.inspector-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.inspector-btn-primary {
+    border-color: rgba(125, 211, 252, 0.35);
+    background: var(--inspector-accent-soft);
+    color: var(--inspector-accent);
+}
+
+.inspector-btn-danger {
+    border-color: rgba(251, 143, 143, 0.3);
+    color: var(--inspector-red);
+}
+
+.inspector-code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+    tab-size: 2;
+}
+
+.inspector-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--inspector-border);
+    padding: 2px 7px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--inspector-muted);
 }
