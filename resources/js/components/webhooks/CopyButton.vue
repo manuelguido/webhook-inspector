@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
+
+import { cn } from '@/lib/utils';
 
 const props = withDefaults(
     defineProps<{
@@ -7,17 +9,31 @@ const props = withDefaults(
         label?: string;
         copiedLabel?: string;
         disabled?: boolean;
+        variant?: 'primary' | 'secondary' | 'tertiary';
     }>(),
     {
         label: 'Copy',
         copiedLabel: 'Copied',
         disabled: false,
+        variant: 'secondary',
     },
 );
 
 const copied = ref(false);
 const error = ref('');
 let resetTimer: number | undefined;
+
+const buttonClass = computed(() =>
+    cn(
+        'inspector-btn inspector-focus',
+        props.variant === 'primary' && 'inspector-btn-primary',
+        props.variant === 'secondary' && 'inspector-btn-secondary',
+        props.variant === 'tertiary' &&
+            'min-h-0 border-transparent px-2 py-1 text-xs',
+        copied.value &&
+            'border-[rgba(116,231,164,0.35)] text-[var(--inspector-green)]',
+    ),
+);
 
 const fallbackCopy = (value: string) => {
     const textarea = document.createElement('textarea');
@@ -54,17 +70,25 @@ const copy = async () => {
         error.value = 'Clipboard blocked';
     }
 };
+
+onBeforeUnmount(() => {
+    window.clearTimeout(resetTimer);
+});
 </script>
 
 <template>
-    <button
-        type="button"
-        class="inspector-btn inspector-focus"
-        :class="{ 'border-[rgba(103,232,165,0.35)] text-[var(--inspector-green)]': copied }"
-        :disabled="disabled"
-        :title="error || label"
-        @click="copy"
-    >
-        {{ copied ? copiedLabel : label }}
-    </button>
+    <span class="inline-flex flex-col items-end gap-1">
+        <button
+            type="button"
+            :class="buttonClass"
+            :disabled="disabled"
+            :title="error || label"
+            @click="copy"
+        >
+            {{ copied ? copiedLabel : label }}
+        </button>
+        <span class="sr-only" aria-live="polite">
+            {{ copied ? copiedLabel : error }}
+        </span>
+    </span>
 </template>

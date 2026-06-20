@@ -1,32 +1,28 @@
 <script setup lang="ts">
+import CopyButton from '@/components/webhooks/CopyButton.vue';
+import EmptyState from '@/components/webhooks/EmptyState.vue';
+import HttpMethodBadge from '@/components/webhooks/ui/HttpMethodBadge.vue';
+import Panel from '@/components/webhooks/ui/Panel.vue';
+import PanelHeader from '@/components/webhooks/ui/PanelHeader.vue';
+import StatusBadge from '@/components/webhooks/ui/StatusBadge.vue';
 import type { CapturedWebhookRequest } from '@/types/webhooks';
 
-defineProps<{
-    requests: CapturedWebhookRequest[];
-    selectedId: number | null;
-}>();
+withDefaults(
+    defineProps<{
+        isRefreshing?: boolean;
+        requests: CapturedWebhookRequest[];
+        selectedId: number | null;
+        webhookUrl?: string;
+    }>(),
+    {
+        isRefreshing: false,
+        webhookUrl: '',
+    },
+);
 
 const emit = defineEmits<{
     select: [request: CapturedWebhookRequest];
 }>();
-
-const methodClass = (method: string) => {
-    const normalized = method.toUpperCase();
-
-    if (normalized === 'GET') {
-        return 'border-[rgba(125,211,252,0.35)] text-[var(--inspector-accent)]';
-    }
-
-    if (normalized === 'POST') {
-        return 'border-[rgba(103,232,165,0.35)] text-[var(--inspector-green)]';
-    }
-
-    if (['PUT', 'PATCH'].includes(normalized)) {
-        return 'border-[rgba(244,198,118,0.35)] text-[var(--inspector-amber)]';
-    }
-
-    return 'border-[rgba(251,143,143,0.35)] text-[var(--inspector-red)]';
-};
 
 const formatTime = (value: string) =>
     new Intl.DateTimeFormat(undefined, {
@@ -34,55 +30,150 @@ const formatTime = (value: string) =>
         minute: '2-digit',
         second: '2-digit',
     }).format(new Date(value));
+
+const formatBytes = (bytes: number) => {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    return `${(bytes / 1024).toFixed(1)} KB`;
+};
+
+const eventLabel = (request: CapturedWebhookRequest) => {
+    if (
+        request.json_body &&
+        typeof request.json_body === 'object' &&
+        !Array.isArray(request.json_body) &&
+        'event' in request.json_body &&
+        typeof request.json_body.event === 'string'
+    ) {
+        return request.json_body.event;
+    }
+
+    return request.content_type || 'no content type';
+};
+
+const parseState = (request: CapturedWebhookRequest) => {
+    if (request.body_truncated) {
+        return 'truncated';
+    }
+
+    if (request.has_json_body) {
+        return 'json';
+    }
+
+    if (request.raw_body) {
+        return 'raw';
+    }
+
+    return 'empty';
+};
+
+const stateTone = (request: CapturedWebhookRequest) => {
+    if (request.body_truncated) {
+        return 'warning';
+    }
+
+    if (request.has_json_body) {
+        return 'success';
+    }
+
+    return 'muted';
+};
 </script>
 
 <template>
-    <section class="inspector-panel flex min-h-[420px] flex-col overflow-hidden">
-        <div class="inspector-panel-header flex items-center justify-between gap-3 p-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--inspector-accent)]">
-                    Incoming traffic
-                </p>
-                <h2 class="mt-1 text-base font-semibold text-[var(--inspector-fg)]">Captured requests</h2>
-            </div>
-            <span class="inspector-badge">{{ requests.length }} total</span>
-        </div>
+    <Panel panel-class="h-full">
+        <PanelHeader label="Incoming traffic" title="Captured requests">
+            <template #actions>
+                <StatusBadge tone="muted"
+                    >{{ requests.length }} total</StatusBadge
+                >
+            </template>
+        </PanelHeader>
 
-        <div v-if="requests.length" class="max-h-[640px] overflow-auto">
+        <div
+            v-if="requests.length"
+            class="max-h-[680px] overflow-auto"
+            :aria-busy="isRefreshing"
+        >
             <button
                 v-for="request in requests"
                 :key="request.id"
                 type="button"
-                class="inspector-focus block w-full border-b border-[var(--inspector-border)] p-4 text-left transition hover:bg-[rgba(255,255,255,0.025)]"
-                :class="{ 'bg-[var(--inspector-accent-soft)]': selectedId === request.id }"
+                class="inspector-focus block w-full border-b border-[var(--inspector-border-soft)] p-3 text-left transition hover:bg-[rgba(255,255,255,0.025)]"
+                :aria-pressed="selectedId === request.id"
+                :class="{
+                    'border-l-2 border-l-[var(--inspector-accent)] bg-[var(--inspector-accent-soft)]':
+                        selectedId === request.id,
+                }"
                 @click="emit('select', request)"
             >
-                <div class="flex items-center justify-between gap-3">
-                    <span class="inspector-badge" :class="methodClass(request.method)">
-                        {{ request.method }}
-                    </span>
-                    <span class="inspector-badge border-[rgba(103,232,165,0.25)] text-[var(--inspector-green)]">
-                        captured
-                    </span>
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <HttpMethodBadge :method="request.method" />
+                        <div class="min-w-0">
+                            <p
+                                class="truncate text-sm font-bold text-[var(--inspector-fg)]"
+                            >
+                                {{ eventLabel(request) }}
+                            </p>
+                            <p
+                                class="mt-1 truncate text-xs font-light text-[var(--inspector-faint)]"
+                            >
+                                {{ request.path }}
+                            </p>
+                        </div>
+                    </div>
+                    <StatusBadge
+                        :tone="stateTone(request)"
+                        badge-class="shrink-0"
+                    >
+                        {{ parseState(request) }}
+                    </StatusBadge>
                 </div>
-                <p class="mt-3 truncate text-sm font-medium text-[var(--inspector-fg)]">
-                    {{ request.path }}
-                </p>
-                <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--inspector-faint)]">
-                    <span>{{ formatTime(request.captured_at) }}</span>
-                    <span>{{ request.content_type || 'no content type' }}</span>
-                    <span>{{ request.body_size }} bytes</span>
+
+                <div
+                    class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-light text-[var(--inspector-faint)]"
+                >
+                    <span class="inspector-mono">#{{ request.id }}</span>
+                    <span class="inspector-mono">{{
+                        formatTime(request.captured_at)
+                    }}</span>
+                    <span>{{ formatBytes(request.body_size) }}</span>
+                    <span v-if="selectedId === request.id" class="sr-only"
+                        >selected</span
+                    >
                 </div>
             </button>
         </div>
 
-        <div v-else class="flex flex-1 items-center justify-center p-4 text-center">
-            <div>
-                <p class="text-sm font-semibold text-[var(--inspector-fg)]">No requests yet</p>
-                <p class="mt-2 text-sm leading-6 text-[var(--inspector-muted)]">
-                    Send the curl example or point any webhook sender at the URL above.
-                </p>
-            </div>
+        <div
+            v-else-if="isRefreshing"
+            class="grid gap-2 p-4"
+            aria-label="Loading requests"
+        >
+            <div
+                v-for="index in 3"
+                :key="index"
+                class="inspector-skeleton h-16 rounded-[var(--inspector-radius-sm)]"
+            />
         </div>
-    </section>
+
+        <div v-else class="p-4">
+            <EmptyState
+                compact
+                title="No requests yet"
+                description="Send a request to the endpoint above and it will appear here automatically."
+            >
+                <template v-if="webhookUrl" #actions>
+                    <CopyButton
+                        :value="webhookUrl"
+                        label="Copy endpoint"
+                        copied-label="Endpoint copied"
+                    />
+                </template>
+            </EmptyState>
+        </div>
+    </Panel>
 </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import CodeBlock from '@/components/webhooks/ui/CodeBlock.vue';
+import StatusBadge from '@/components/webhooks/ui/StatusBadge.vue';
 import type { CapturedWebhookRequest } from '@/types/webhooks';
 
 const props = defineProps<{
@@ -32,22 +34,31 @@ const label = computed(() => {
 <template>
     <div>
         <div class="mb-3 flex flex-wrap items-center gap-2">
-            <h3 class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--inspector-faint)]">
+            <h3 class="text-sm font-bold text-[var(--inspector-fg)]">
                 {{ label }}
             </h3>
-            <span v-if="request.body_truncated" class="inspector-badge border-[rgba(244,198,118,0.35)] text-[var(--inspector-amber)]">
+            <StatusBadge v-if="request.body_truncated" tone="warning">
                 truncated
-            </span>
-            <span v-if="request.has_json_body && mode === 'body'" class="inspector-badge border-[rgba(103,232,165,0.35)] text-[var(--inspector-green)]">
+            </StatusBadge>
+            <StatusBadge
+                v-if="request.has_json_body && mode === 'body'"
+                tone="success"
+            >
                 parsed json
-            </span>
+            </StatusBadge>
         </div>
 
-        <pre
+        <CodeBlock
             v-if="content"
-            class="inspector-code max-h-[520px] overflow-auto border border-[var(--inspector-border)] bg-[#0b1118] p-4 text-[var(--inspector-muted)]"
-        ><code>{{ content }}</code></pre>
-        <p v-else class="border border-dashed border-[var(--inspector-border)] p-4 text-sm text-[var(--inspector-muted)]">
+            :value="content"
+            :label="label"
+            copyable
+            copy-label="Copy body"
+        />
+        <p
+            v-else
+            class="rounded-[var(--inspector-radius-sm)] border border-dashed border-[var(--inspector-border)] p-4 text-sm font-light text-[var(--inspector-muted)]"
+        >
             This request did not include a body.
         </p>
     </div>
