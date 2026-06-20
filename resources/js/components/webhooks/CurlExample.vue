@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import CopyButton from '@/components/webhooks/CopyButton.vue';
+import CodeBlock from '@/components/webhooks/ui/CodeBlock.vue';
+import Panel from '@/components/webhooks/ui/Panel.vue';
+import PanelHeader from '@/components/webhooks/ui/PanelHeader.vue';
 
 const props = defineProps<{
     webhookUrl: string;
 }>();
+
+const isOpen = ref(false);
 
 const curlCommand = computed(
     () => `curl -X POST "${props.webhookUrl}?source=portfolio" \\
@@ -26,19 +31,37 @@ const curlCommand = computed(
 </script>
 
 <template>
-    <section class="inspector-panel overflow-hidden">
-        <div class="inspector-panel-header flex items-center justify-between gap-3 p-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--inspector-green)]">
-                    Quick test
-                </p>
-                <h2 class="mt-1 text-base font-semibold text-[var(--inspector-fg)]">Example curl request</h2>
-            </div>
-            <CopyButton :value="curlCommand" label="Copy curl" copied-label="curl copied" />
-        </div>
+    <Panel>
+        <PanelHeader
+            label="Quick test"
+            title="Example curl request"
+            description="Keep a ready-made request close by without letting it dominate the inspector."
+        >
+            <template #actions>
+                <CopyButton
+                    :value="curlCommand"
+                    label="Copy curl"
+                    copied-label="curl copied"
+                />
+                <button
+                    type="button"
+                    class="inspector-btn inspector-focus"
+                    :aria-expanded="isOpen"
+                    aria-controls="curl-example"
+                    @click="isOpen = !isOpen"
+                >
+                    {{ isOpen ? 'Hide example' : 'Show example' }}
+                </button>
+            </template>
+        </PanelHeader>
 
-        <pre
-            class="inspector-code max-h-[260px] overflow-auto bg-[#0b1118] p-4 text-[var(--inspector-muted)]"
-        ><code>{{ curlCommand }}</code></pre>
-    </section>
+        <div v-if="isOpen" id="curl-example" class="p-4">
+            <CodeBlock
+                :value="curlCommand"
+                label="Terminal command"
+                copyable
+                copy-label="Copy curl"
+            />
+        </div>
+    </Panel>
 </template>
