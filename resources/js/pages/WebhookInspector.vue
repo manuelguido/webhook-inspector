@@ -26,15 +26,20 @@ const props = defineProps<{
 const bin = ref(props.bin);
 const requests = ref<CapturedWebhookRequest[]>(props.requests);
 const selectedId = ref<number | null>(props.requests[0]?.id ?? null);
-const isRefreshing = ref(false);
+const isInitialLoading = ref(false);
+const isManualRefreshing = ref(false);
+const isPolling = ref(false);
 const isClearing = ref(false);
 const error = ref('');
+const pollingError = ref('');
 const lastRefreshedAt = ref<Date | null>(null);
+const recentlyArrivedIds = ref<ReadonlySet<number>>(new Set());
 const sidebarOpen = ref(false);
 const quickTestOpen = ref(false);
 const aboutOpen = ref(false);
 const theme = ref<'dark' | 'light'>('dark');
 let pollTimer: number | undefined;
+const arrivalTimers: number[] = [];
 
 const csrfToken = () =>
     document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
@@ -47,6 +52,10 @@ const selectedRequest = computed(
 );
 
 const lastRefreshedLabel = computed(() => {
+    if (pollingError.value) {
+        return 'Polling issue. Retrying';
+    }
+
     if (!lastRefreshedAt.value) {
         return 'Live polling ready';
     }
@@ -54,17 +63,111 @@ const lastRefreshedLabel = computed(() => {
     return `Updated ${lastRefreshedAt.value.toLocaleTimeString()}`;
 });
 
-const replaceRequests = (nextRequests: CapturedWebhookRequest[]) => {
-    requests.value = nextRequests;
+const stableStringify = (value: unknown): string =>
+    JSON.stringify(value) ?? 'undefined';
 
-    if (!requests.value.some((request) => request.id === selectedId.value)) {
-        selectedId.value = requests.value[0]?.id ?? null;
+const requestsAreEquivalent = (
+    current: CapturedWebhookRequest,
+    incoming: CapturedWebhookRequest,
+) =>
+    current.method === incoming.method &&
+    current.path === incoming.path &&
+    current.full_url === incoming.full_url &&
+    current.raw_body === incoming.raw_body &&
+    current.has_json_body === incoming.has_json_body &&
+    current.content_type === incoming.content_type &&
+    current.ip_address === incoming.ip_address &&
+    current.user_agent === incoming.user_agent &&
+    current.body_size === incoming.body_size &&
+    current.body_truncated === incoming.body_truncated &&
+    current.captured_at === incoming.captured_at &&
+    stableStringify(current.headers) === stableStringify(incoming.headers) &&
+    stableStringify(current.query_params) ===
+        stableStringify(incoming.query_params) &&
+    stableStringify(current.json_body) === stableStringify(incoming.json_body);
+
+const markRecentlyArrived = (requestIds: number[]) => {
+    if (!requestIds.length) {
+        return;
     }
+
+    recentlyArrivedIds.value = new Set([
+        ...recentlyArrivedIds.value,
+        ...requestIds,
+    ]);
+
+    const timer = window.setTimeout(() => {
+        recentlyArrivedIds.value = new Set(
+            [...recentlyArrivedIds.value].filter(
+                (requestId) => !requestIds.includes(requestId),
+            ),
+        );
+    }, 1400);
+
+    arrivalTimers.push(timer);
 };
 
-const refreshRequests = async () => {
-    isRefreshing.value = true;
-    error.value = '';
+const mergeIncomingRequests = (incoming: CapturedWebhookRequest[]) => {
+    const currentById = new Map(
+        requests.value.map((request) => [request.id, request]),
+    );
+    const incomingIds = new Set(incoming.map((request) => request.id));
+    const arrivedIds: number[] = [];
+    let hasChanges =
+        incoming.length !== requests.value.length ||
+        incoming.some(
+            (request, index) => requests.value[index]?.id !== request.id,
+        );
+
+    const nextRequests = incoming.map((incomingRequest) => {
+        const currentRequest = currentById.get(incomingRequest.id);
+
+        if (!currentRequest) {
+            arrivedIds.push(incomingRequest.id);
+            hasChanges = true;
+
+            return incomingRequest;
+        }
+
+        if (requestsAreEquivalent(currentRequest, incomingRequest)) {
+            return currentRequest;
+        }
+
+        hasChanges = true;
+
+        return incomingRequest;
+    });
+
+    if (hasChanges) {
+        requests.value = nextRequests;
+    }
+
+    if (selectedId.value !== null && !incomingIds.has(selectedId.value)) {
+        selectedId.value = nextRequests[0]?.id ?? null;
+    }
+
+    if (selectedId.value === null && nextRequests.length) {
+        selectedId.value = nextRequests[0].id;
+    }
+
+    markRecentlyArrived(arrivedIds);
+};
+
+const fetchRequests = async ({ silent = false } = {}) => {
+    if (silent) {
+        if (isPolling.value || isManualRefreshing.value || isClearing.value) {
+            return;
+        }
+
+        isPolling.value = true;
+    } else {
+        if (isManualRefreshing.value) {
+            return;
+        }
+
+        isManualRefreshing.value = true;
+        error.value = '';
+    }
 
     try {
         const response = await fetch(bin.value.requests_url, {
@@ -80,17 +183,31 @@ const refreshRequests = async () => {
         const payload = (await response.json()) as {
             requests: CapturedWebhookRequest[];
         };
-        replaceRequests(payload.requests);
+        mergeIncomingRequests(payload.requests);
         lastRefreshedAt.value = new Date();
+        pollingError.value = '';
     } catch (exception) {
-        error.value =
+        const message =
             exception instanceof Error
                 ? exception.message
                 : 'Unable to refresh requests.';
+
+        if (silent) {
+            pollingError.value = message;
+        } else {
+            error.value = message;
+        }
     } finally {
-        isRefreshing.value = false;
+        if (silent) {
+            isPolling.value = false;
+        } else {
+            isInitialLoading.value = false;
+            isManualRefreshing.value = false;
+        }
     }
 };
+
+const refreshRequests = () => fetchRequests({ silent: false });
 
 const clearRequests = async () => {
     if (!requests.value.length || isClearing.value) {
@@ -117,7 +234,9 @@ const clearRequests = async () => {
             throw new Error(`Clear failed with HTTP ${response.status}.`);
         }
 
-        replaceRequests([]);
+        requests.value = [];
+        selectedId.value = null;
+        recentlyArrivedIds.value = new Set();
         lastRefreshedAt.value = new Date();
     } catch (exception) {
         error.value =
@@ -168,14 +287,16 @@ onMounted(() => {
         document.documentElement.dataset.theme = theme.value;
     }
 
-    pollTimer = window.setInterval(
-        refreshRequests,
-        props.limits.poll_interval_ms,
-    );
+    pollTimer = window.setInterval(() => {
+        void fetchRequests({ silent: true });
+    }, props.limits.poll_interval_ms);
 });
 
 onBeforeUnmount(() => {
     window.clearInterval(pollTimer);
+    arrivalTimers.forEach((timer) => {
+        window.clearTimeout(timer);
+    });
 });
 </script>
 
@@ -210,9 +331,10 @@ onBeforeUnmount(() => {
         >
             <ContextSidebar
                 :bin="bin"
-                :is-refreshing="isRefreshing"
+                :is-initial-loading="isInitialLoading"
                 :last-refreshed-label="lastRefreshedLabel"
                 :limits="limits"
+                :recently-arrived-ids="recentlyArrivedIds"
                 :request-count="requests.length"
                 :requests="requests"
                 :selected-id="selectedId"
@@ -225,7 +347,7 @@ onBeforeUnmount(() => {
         <section class="inspector-workspace flex min-h-dvh min-w-0 flex-col">
             <InspectorHeader
                 :is-clearing="isClearing"
-                :is-refreshing="isRefreshing"
+                :is-refreshing="isManualRefreshing"
                 :last-refreshed-label="lastRefreshedLabel"
                 :limits="limits"
                 :request="selectedRequest"

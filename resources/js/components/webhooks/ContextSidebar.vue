@@ -10,9 +10,10 @@ import type {
 
 defineProps<{
     bin: WebhookBin;
-    isRefreshing: boolean;
+    isInitialLoading: boolean;
     lastRefreshedLabel: string;
     limits: InspectorLimits;
+    recentlyArrivedIds: ReadonlySet<number>;
     requestCount: number;
     requests: CapturedWebhookRequest[];
     selectedId: number | null;
@@ -69,7 +70,8 @@ const emit = defineEmits<{
 
                 <RequestList
                     class="min-h-0 flex-1"
-                    :is-refreshing="isRefreshing"
+                    :is-initial-loading="isInitialLoading"
+                    :recently-arrived-ids="recentlyArrivedIds"
                     :requests="requests"
                     :selected-id="selectedId"
                     :webhook-url="bin.webhook_url"

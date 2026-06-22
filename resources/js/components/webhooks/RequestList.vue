@@ -14,13 +14,15 @@ import type { CapturedWebhookRequest } from '@/types/webhooks';
 
 const props = withDefaults(
     defineProps<{
-        isRefreshing?: boolean;
+        isInitialLoading?: boolean;
+        recentlyArrivedIds?: ReadonlySet<number>;
         requests: CapturedWebhookRequest[];
         selectedId: number | null;
         webhookUrl?: string;
     }>(),
     {
-        isRefreshing: false,
+        isInitialLoading: false,
+        recentlyArrivedIds: () => new Set<number>(),
         webhookUrl: '',
     },
 );
@@ -50,7 +52,7 @@ const selectOffset = (index: number, offset: number) => {
         <div
             v-if="requests.length"
             class="min-h-0 flex-1 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)]"
-            :aria-busy="isRefreshing"
+            :aria-busy="isInitialLoading"
             aria-label="Captured requests"
             role="listbox"
         >
@@ -59,6 +61,9 @@ const selectOffset = (index: number, offset: number) => {
                 :key="request.id"
                 type="button"
                 class="request-row inspector-focus block w-full border-b border-[var(--border-subtle)] px-3 py-3 text-left transition last:border-b-0 hover:bg-[var(--surface-hover)]"
+                :class="{
+                    'request-arrived': recentlyArrivedIds.has(request.id),
+                }"
                 role="option"
                 :aria-selected="selectedId === request.id"
                 @click="emit('select', request)"
@@ -112,7 +117,7 @@ const selectOffset = (index: number, offset: number) => {
         </div>
 
         <div
-            v-else-if="isRefreshing"
+            v-else-if="isInitialLoading"
             class="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)] p-3"
             aria-label="Loading requests"
         >
