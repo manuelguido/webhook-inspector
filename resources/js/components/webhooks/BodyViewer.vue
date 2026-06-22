@@ -34,7 +34,7 @@ const label = computed(() => {
 <template>
     <div>
         <div class="mb-3 flex flex-wrap items-center gap-2">
-            <h3 class="text-sm font-bold text-[var(--inspector-fg)]">
+            <h3 class="text-sm font-bold text-[var(--text-primary)]">
                 {{ label }}
             </h3>
             <StatusBadge v-if="request.body_truncated" tone="warning">
@@ -52,12 +52,16 @@ const label = computed(() => {
             v-if="content"
             :value="content"
             :label="label"
+            :language="
+                request.has_json_body && mode === 'body' ? 'json' : 'text'
+            "
+            allow-wrap
             copyable
             copy-label="Copy body"
         />
         <p
             v-else
-            class="rounded-[var(--inspector-radius-sm)] border border-dashed border-[var(--inspector-border)] p-4 text-sm font-light text-[var(--inspector-muted)]"
+            class="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 text-sm font-light text-[var(--text-secondary)]"
         >
             This request did not include a body.
         </p>
