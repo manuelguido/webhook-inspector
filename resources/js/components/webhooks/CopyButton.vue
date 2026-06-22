@@ -30,8 +30,7 @@ const buttonClass = computed(() =>
         props.variant === 'secondary' && 'inspector-btn-secondary',
         props.variant === 'tertiary' &&
             'min-h-0 border-transparent px-2 py-1 text-xs',
-        copied.value &&
-            'border-[rgba(116,231,164,0.35)] text-[var(--inspector-green)]',
+        copied.value && 'border-[var(--success)] text-[var(--success)]',
     ),
 );
 

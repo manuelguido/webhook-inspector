@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import ContextSidebar from '@/components/webhooks/ContextSidebar.vue';
 import CurlExample from '@/components/webhooks/CurlExample.vue';
+import InspectorHeader from '@/components/webhooks/InspectorHeader.vue';
+import NavigationRail from '@/components/webhooks/NavigationRail.vue';
 import RequestDetail from '@/components/webhooks/RequestDetail.vue';
-import RequestList from '@/components/webhooks/RequestList.vue';
 import ErrorBanner from '@/components/webhooks/ui/ErrorBanner.vue';
-import StatusBadge from '@/components/webhooks/ui/StatusBadge.vue';
-import WebhookUrlPanel from '@/components/webhooks/WebhookUrlPanel.vue';
+import WorkbenchDrawer from '@/components/webhooks/WorkbenchDrawer.vue';
 import type {
     CapturedWebhookRequest,
     InspectorLimits,
@@ -29,6 +30,10 @@ const isRefreshing = ref(false);
 const isClearing = ref(false);
 const error = ref('');
 const lastRefreshedAt = ref<Date | null>(null);
+const sidebarOpen = ref(false);
+const quickTestOpen = ref(false);
+const aboutOpen = ref(false);
+const theme = ref<'dark' | 'light'>('dark');
 let pollTimer: number | undefined;
 
 const csrfToken = () =>
@@ -48,12 +53,6 @@ const lastRefreshedLabel = computed(() => {
 
     return `Updated ${lastRefreshedAt.value.toLocaleTimeString()}`;
 });
-
-const requestCountLabel = computed(() =>
-    requests.value.length === 1
-        ? '1 request'
-        : `${requests.value.length} requests`,
-);
 
 const replaceRequests = (nextRequests: CapturedWebhookRequest[]) => {
     requests.value = nextRequests;
@@ -130,7 +129,45 @@ const clearRequests = async () => {
     }
 };
 
+const selectRequest = (request: CapturedWebhookRequest) => {
+    selectedId.value = request.id;
+
+    if (window.matchMedia('(width <= 1100px)').matches) {
+        sidebarOpen.value = false;
+    }
+};
+
+const focusEndpoint = () => {
+    sidebarOpen.value = true;
+    requestAnimationFrame(() => {
+        document.getElementById('endpoint-summary')?.focus();
+    });
+};
+
+const focusInspector = () => {
+    requestAnimationFrame(() => {
+        document.getElementById('inspector-workspace')?.focus();
+    });
+};
+
+const toggleTheme = () => {
+    theme.value = theme.value === 'dark' ? 'light' : 'dark';
+};
+
+watch(theme, (nextTheme) => {
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem('webhook-inspector-theme', nextTheme);
+});
+
 onMounted(() => {
+    const storedTheme = window.localStorage.getItem('webhook-inspector-theme');
+
+    if (storedTheme === 'dark' || storedTheme === 'light') {
+        theme.value = storedTheme;
+    } else {
+        document.documentElement.dataset.theme = theme.value;
+    }
+
     pollTimer = window.setInterval(
         refreshRequests,
         props.limits.poll_interval_ms,
@@ -145,137 +182,142 @@ onBeforeUnmount(() => {
 <template>
     <Head title="Webhook Inspector" />
 
-    <main class="inspector-page px-4 py-4 sm:px-6 lg:px-8">
-        <div class="mx-auto flex w-full max-w-7xl flex-col gap-4">
-            <header
-                class="flex flex-col gap-3 border-b border-[var(--inspector-border-soft)] pb-4 lg:flex-row lg:items-center lg:justify-between"
-            >
-                <div class="min-w-0">
-                    <p class="inspector-section-label">Webhook Inspector</p>
-                    <h1
-                        class="mt-1 text-2xl font-bold tracking-normal text-[var(--inspector-fg)] sm:text-3xl"
-                    >
-                        Capture and inspect incoming webhooks
-                    </h1>
-                    <p
-                        class="mt-1 max-w-2xl text-sm leading-6 font-light text-[var(--inspector-muted)]"
-                    >
-                        A focused request bin for debugging headers, query
-                        strings, parsed JSON and raw payloads.
-                    </p>
-                </div>
+    <main class="app-shell">
+        <NavigationRail
+            :request-count="requests.length"
+            :sidebar-open="sidebarOpen"
+            :theme="theme"
+            @focus-endpoint="focusEndpoint"
+            @focus-inspector="focusInspector"
+            @open-about="aboutOpen = true"
+            @open-quick-test="quickTestOpen = true"
+            @toggle-sidebar="sidebarOpen = !sidebarOpen"
+            @toggle-theme="toggleTheme"
+        />
 
-                <div class="flex flex-col gap-3 lg:items-end">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <StatusBadge tone="success">No login</StatusBadge>
-                        <StatusBadge tone="muted"
-                            >Polling
-                            {{ limits.poll_interval_ms / 1000 }}s</StatusBadge
-                        >
-                        <StatusBadge tone="muted">{{
-                            lastRefreshedLabel
-                        }}</StatusBadge>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            class="inspector-btn inspector-btn-primary inspector-focus"
-                            :disabled="isRefreshing"
-                            @click="refreshRequests"
-                        >
-                            {{ isRefreshing ? 'Refreshing...' : 'Refresh' }}
-                        </button>
-                        <button
-                            type="button"
-                            class="inspector-btn inspector-btn-danger inspector-focus"
-                            :disabled="isClearing || requests.length === 0"
-                            @click="clearRequests"
-                        >
-                            {{ isClearing ? 'Clearing...' : 'Clear requests' }}
-                        </button>
-                    </div>
-                </div>
-            </header>
+        <button
+            v-if="sidebarOpen"
+            type="button"
+            class="workbench-drawer-backdrop fixed inset-0 z-20 hidden cursor-default max-[1100px]:block"
+            aria-label="Close request sidebar"
+            @click="sidebarOpen = false"
+        />
+
+        <aside
+            id="context-sidebar"
+            class="context-sidebar z-30"
+            :data-open="sidebarOpen"
+        >
+            <ContextSidebar
+                :bin="bin"
+                :is-refreshing="isRefreshing"
+                :last-refreshed-label="lastRefreshedLabel"
+                :limits="limits"
+                :request-count="requests.length"
+                :requests="requests"
+                :selected-id="selectedId"
+                @close="sidebarOpen = false"
+                @open-quick-test="quickTestOpen = true"
+                @select="selectRequest"
+            />
+        </aside>
+
+        <section class="inspector-workspace flex min-h-dvh min-w-0 flex-col">
+            <InspectorHeader
+                :is-clearing="isClearing"
+                :is-refreshing="isRefreshing"
+                :last-refreshed-label="lastRefreshedLabel"
+                :limits="limits"
+                :request="selectedRequest"
+                :request-count="requests.length"
+                @clear-requests="clearRequests"
+                @refresh-requests="refreshRequests"
+                @toggle-sidebar="sidebarOpen = !sidebarOpen"
+            />
 
             <ErrorBanner
                 v-if="error"
+                class="mx-5 mt-4"
                 :message="error"
                 @retry="refreshRequests"
             />
 
-            <WebhookUrlPanel
-                :bin="bin"
-                :limits="limits"
-                :request-count="requests.length"
+            <RequestDetail
+                :request="selectedRequest"
+                :webhook-url="bin.webhook_url"
+                @open-quick-test="quickTestOpen = true"
             />
-            <CurlExample :webhook-url="bin.webhook_url" />
+        </section>
 
-            <section
-                aria-labelledby="request-workspace-title"
-                class="grid gap-4 lg:grid-cols-[minmax(280px,0.42fr)_minmax(0,1fr)]"
+        <WorkbenchDrawer
+            :open="quickTestOpen"
+            title="Quick test"
+            description="A ready-made request for validating capture, headers, query parameters and JSON parsing."
+            @close="quickTestOpen = false"
+        >
+            <CurlExample :webhook-url="bin.webhook_url" />
+        </WorkbenchDrawer>
+
+        <WorkbenchDrawer
+            :open="aboutOpen"
+            title="About this demo"
+            description="What this workbench demonstrates and what it intentionally keeps simple."
+            @close="aboutOpen = false"
+        >
+            <div
+                class="grid gap-4 text-sm leading-6 text-[var(--text-secondary)]"
             >
+                <p>
+                    This public endpoint accepts GET, POST, PUT, PATCH and
+                    DELETE requests for inspection during development.
+                </p>
                 <div
-                    class="flex items-center justify-between gap-3 lg:col-span-2"
+                    class="grid gap-3 sm:grid-cols-2"
+                    aria-label="Demo capabilities"
                 >
-                    <div>
-                        <p
-                            class="inspector-section-label"
-                            id="request-workspace-title"
-                        >
-                            Request workspace
+                    <div class="inspector-subtle-card p-3">
+                        <h3 class="font-bold text-[var(--text-primary)]">
+                            Capture
+                        </h3>
+                        <p class="mt-1 font-light">
+                            Incoming method, URL, headers, query parameters,
+                            JSON and raw request bodies.
                         </p>
-                        <p
-                            class="mt-1 text-sm font-light text-[var(--inspector-muted)]"
-                        >
-                            {{ requestCountLabel }} captured for this endpoint.
+                    </div>
+                    <div class="inspector-subtle-card p-3">
+                        <h3 class="font-bold text-[var(--text-primary)]">
+                            Inspect
+                        </h3>
+                        <p class="mt-1 font-light">
+                            Request metadata, parsed JSON, headers, query values
+                            and raw payloads stay available in tabs.
+                        </p>
+                    </div>
+                    <div class="inspector-subtle-card p-3">
+                        <h3 class="font-bold text-[var(--text-primary)]">
+                            Retain
+                        </h3>
+                        <p class="mt-1 font-light">
+                            The session keeps the latest
+                            <span class="technical-value">{{
+                                limits.max_requests_per_bin
+                            }}</span>
+                            requests and enforces the configured body limit.
+                        </p>
+                    </div>
+                    <div class="inspector-subtle-card p-3">
+                        <h3 class="font-bold text-[var(--text-primary)]">
+                            Refresh
+                        </h3>
+                        <p class="mt-1 font-light">
+                            Manual refresh works alongside polling every
+                            <span class="technical-value"
+                                >{{ limits.poll_interval_ms / 1000 }}s</span
+                            >.
                         </p>
                     </div>
                 </div>
-
-                <RequestList
-                    :is-refreshing="isRefreshing"
-                    :requests="requests"
-                    :selected-id="selectedId"
-                    :webhook-url="bin.webhook_url"
-                    @select="selectedId = $event.id"
-                />
-
-                <RequestDetail :request="selectedRequest" />
-            </section>
-
-            <details
-                class="rounded-[var(--inspector-radius)] border border-[var(--inspector-border-soft)] bg-[rgba(255,255,255,0.012)] p-3"
-            >
-                <summary
-                    class="cursor-pointer text-sm font-bold text-[var(--inspector-muted)]"
-                >
-                    About this demo
-                </summary>
-                <div
-                    class="mt-3 grid gap-3 text-sm leading-6 font-light text-[var(--inspector-muted)] sm:grid-cols-2 lg:grid-cols-4"
-                >
-                    <p>
-                        <strong class="font-bold text-[var(--inspector-fg)]"
-                            >Capture</strong
-                        ><br />GET, POST, PUT, PATCH and DELETE.
-                    </p>
-                    <p>
-                        <strong class="font-bold text-[var(--inspector-fg)]"
-                            >Inspect</strong
-                        ><br />Headers, query, JSON and raw body.
-                    </p>
-                    <p>
-                        <strong class="font-bold text-[var(--inspector-fg)]"
-                            >Retain</strong
-                        ><br />Latest requests with body truncation.
-                    </p>
-                    <p>
-                        <strong class="font-bold text-[var(--inspector-fg)]"
-                            >Refresh</strong
-                        ><br />Manual refresh plus simple polling.
-                    </p>
-                </div>
-            </details>
-        </div>
+            </div>
+        </WorkbenchDrawer>
     </main>
 </template>

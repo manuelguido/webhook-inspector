@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import CopyButton from '@/components/webhooks/CopyButton.vue';
+
 const props = defineProps<{
     title: string;
     items: Record<string, unknown>;
@@ -33,34 +35,40 @@ const rows = computed(() =>
 
 <template>
     <div>
-        <h3 class="mb-3 text-sm font-bold text-[var(--inspector-fg)]">
+        <h3 class="mb-3 text-sm font-bold text-[var(--text-primary)]">
             {{ title }}
         </h3>
 
         <div
             v-if="rows.length"
-            class="overflow-hidden rounded-[var(--inspector-radius-sm)] border border-[var(--inspector-border)]"
+            class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)]"
         >
             <div
                 v-for="row in rows"
                 :key="row.key"
-                class="grid gap-3 border-b border-[var(--inspector-border-soft)] p-3 last:border-b-0 md:grid-cols-[220px_minmax(0,1fr)]"
+                class="grid gap-3 border-b border-[var(--border-subtle)] p-3 last:border-b-0 md:grid-cols-[220px_minmax(0,1fr)_auto]"
             >
                 <div
-                    class="inspector-code font-bold break-all text-[var(--inspector-accent)]"
+                    class="technical-value text-sm font-bold break-all text-[var(--accent)]"
                 >
                     {{ row.key }}
                 </div>
                 <pre
-                    class="inspector-code break-words whitespace-pre-wrap text-[var(--inspector-muted)]"
+                    class="code-content text-sm break-words whitespace-pre-wrap text-[var(--text-secondary)]"
                     >{{ row.value }}</pre
                 >
+                <CopyButton
+                    :value="row.value"
+                    label="Copy"
+                    copied-label="Copied"
+                    variant="tertiary"
+                />
             </div>
         </div>
 
         <p
             v-else
-            class="rounded-[var(--inspector-radius-sm)] border border-dashed border-[var(--inspector-border)] p-4 text-sm font-light text-[var(--inspector-muted)]"
+            class="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 text-sm font-light text-[var(--text-secondary)]"
         >
             {{ emptyMessage }}
         </p>

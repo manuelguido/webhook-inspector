@@ -3,9 +3,11 @@ withDefaults(
     defineProps<{
         description: string;
         title: string;
+        bare?: boolean;
         compact?: boolean;
     }>(),
     {
+        bare: false,
         compact: false,
     },
 );
@@ -13,20 +15,25 @@ withDefaults(
 
 <template>
     <div
-        class="flex flex-col items-center justify-center rounded-[var(--inspector-radius-sm)] border border-dashed border-[var(--inspector-border)] bg-[rgba(255,255,255,0.018)] text-center"
-        :class="compact ? 'p-5' : 'p-8'"
+        class="flex flex-col items-center justify-center rounded-[var(--radius-md)] text-center"
+        :class="[
+            compact ? 'p-5' : 'p-8',
+            bare
+                ? 'bg-transparent'
+                : 'border border-[var(--border-subtle)] bg-[var(--surface)]',
+        ]"
     >
         <div
-            class="mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(125,211,252,0.25)] bg-[var(--inspector-accent-soft)] text-sm font-bold text-[var(--inspector-accent)]"
+            class="mb-4 flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]"
             aria-hidden="true"
         >
             —
         </div>
-        <h3 class="text-base font-bold text-[var(--inspector-fg)]">
+        <h3 class="text-base font-bold text-[var(--text-primary)]">
             {{ title }}
         </h3>
         <p
-            class="mt-2 max-w-md text-sm leading-6 font-light text-[var(--inspector-muted)]"
+            class="mt-2 max-w-md text-sm leading-6 font-light text-[var(--text-secondary)]"
         >
             {{ description }}
         </p>

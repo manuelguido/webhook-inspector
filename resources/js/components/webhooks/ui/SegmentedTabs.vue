@@ -39,7 +39,7 @@ const safeId = (tab: string) =>
 
 <template>
     <div
-        class="flex flex-wrap gap-1 border-b border-[var(--inspector-border)] px-3 py-2"
+        class="flex flex-wrap gap-1 border-b border-[var(--border-subtle)] px-5"
         role="tablist"
         :aria-label="label"
     >
@@ -49,11 +49,11 @@ const safeId = (tab: string) =>
             :key="tab"
             type="button"
             role="tab"
-            class="inspector-focus rounded-[var(--inspector-radius-sm)] px-3 py-2 text-sm font-normal text-[var(--inspector-muted)] transition hover:bg-[var(--inspector-surface-hover)] hover:text-[var(--inspector-fg)]"
+            class="inspector-focus border-b-2 border-transparent px-3 py-3 text-sm font-normal text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
             :aria-controls="`${idPrefix}-${safeId(tab)}-panel`"
             :aria-selected="modelValue === tab"
             :class="{
-                'bg-[var(--inspector-accent-soft)] text-[var(--inspector-accent)]':
+                'border-[var(--accent)] text-[var(--accent)]':
                     modelValue === tab,
             }"
             :tabindex="modelValue === tab ? 0 : -1"

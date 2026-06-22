@@ -2,20 +2,28 @@
 import { computed, ref, watch } from 'vue';
 
 import BodyViewer from '@/components/webhooks/BodyViewer.vue';
+import CopyButton from '@/components/webhooks/CopyButton.vue';
 import EmptyState from '@/components/webhooks/EmptyState.vue';
 import HeadersTable from '@/components/webhooks/HeadersTable.vue';
-import HttpMethodBadge from '@/components/webhooks/ui/HttpMethodBadge.vue';
-import Panel from '@/components/webhooks/ui/Panel.vue';
-import PanelHeader from '@/components/webhooks/ui/PanelHeader.vue';
+import RequestOverview from '@/components/webhooks/RequestOverview.vue';
 import SegmentedTabs from '@/components/webhooks/ui/SegmentedTabs.vue';
-import StatusBadge from '@/components/webhooks/ui/StatusBadge.vue';
 import type { CapturedWebhookRequest } from '@/types/webhooks';
 
-const props = defineProps<{
-    request: CapturedWebhookRequest | null;
+const props = withDefaults(
+    defineProps<{
+        request: CapturedWebhookRequest | null;
+        webhookUrl?: string;
+    }>(),
+    {
+        webhookUrl: '',
+    },
+);
+
+const emit = defineEmits<{
+    openQuickTest: [];
 }>();
 
-type Tab = 'Headers' | 'Overview' | 'Parsed JSON' | 'Query' | 'Raw body';
+type Tab = 'Headers' | 'JSON' | 'Overview' | 'Query' | 'Raw';
 
 const activeTab = ref<Tab>('Overview');
 
@@ -24,71 +32,17 @@ const availableTabs = computed<Tab[]>(() => {
         return [];
     }
 
-    const supportedTabs: Tab[] = ['Overview'];
+    const supportedTabs: Tab[] = ['Overview', 'Headers', 'Query'];
 
     if (props.request.has_json_body) {
-        supportedTabs.push('Parsed JSON');
+        supportedTabs.push('JSON');
     }
 
-    supportedTabs.push('Headers', 'Query');
-
     if (props.request.raw_body) {
-        supportedTabs.push('Raw body');
+        supportedTabs.push('Raw');
     }
 
     return supportedTabs;
-});
-
-const metadata = computed(() => {
-    if (!props.request) {
-        return [];
-    }
-
-    return [
-        ['Method', props.request.method],
-        ['Content type', props.request.content_type || 'none'],
-        ['Request size', formatBytes(props.request.body_size)],
-        ['Captured at', new Date(props.request.captured_at).toLocaleString()],
-        ['Source IP', props.request.ip_address || 'unavailable'],
-        ['User agent', props.request.user_agent || 'unavailable'],
-        ['Full URL', props.request.full_url],
-    ];
-});
-
-const parseLabel = computed(() => {
-    if (!props.request) {
-        return '';
-    }
-
-    if (props.request.body_truncated) {
-        return 'truncated';
-    }
-
-    if (props.request.has_json_body) {
-        return 'parsed json';
-    }
-
-    if (props.request.raw_body) {
-        return 'raw body';
-    }
-
-    return 'empty body';
-});
-
-const parseTone = computed(() => {
-    if (!props.request) {
-        return 'muted';
-    }
-
-    if (props.request.body_truncated) {
-        return 'warning';
-    }
-
-    if (props.request.has_json_body) {
-        return 'success';
-    }
-
-    return 'muted';
 });
 
 const activeTabId = computed(
@@ -99,18 +53,6 @@ const activeTabId = computed(
             .replace(/(^-|-$)/g, '')}`,
 );
 
-const formatBytes = (bytes: number) => {
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-
-    if (bytes < 1024 * 1024) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
 watch([() => props.request?.id, availableTabs], () => {
     if (!availableTabs.value.includes(activeTab.value)) {
         activeTab.value = 'Overview';
@@ -119,23 +61,13 @@ watch([() => props.request?.id, availableTabs], () => {
 </script>
 
 <template>
-    <Panel panel-class="h-full">
-        <PanelHeader
-            label="Request detail"
-            :title="request ? request.path : 'Waiting for traffic'"
-            :description="
-                request
-                    ? 'Inspect metadata, headers, query parameters and payload content.'
-                    : 'Select a captured request to inspect its metadata and payload.'
-            "
-        >
-            <template v-if="request" #actions>
-                <HttpMethodBadge :method="request.method" />
-                <StatusBadge :tone="parseTone">{{ parseLabel }}</StatusBadge>
-            </template>
-        </PanelHeader>
-
-        <div v-if="request" class="flex flex-1 flex-col">
+    <section
+        id="inspector-workspace"
+        class="flex h-full min-h-[calc(100dvh-97px)] min-w-0 flex-col"
+        tabindex="-1"
+        aria-label="Selected request inspector"
+    >
+        <template v-if="request">
             <SegmentedTabs
                 v-model="activeTab"
                 id-prefix="request-detail"
@@ -145,66 +77,13 @@ watch([() => props.request?.id, availableTabs], () => {
 
             <div
                 :id="`${activeTabId}-panel`"
-                class="flex-1 overflow-auto p-4"
+                class="min-h-0 flex-1 overflow-auto p-5"
                 role="tabpanel"
                 :aria-labelledby="activeTabId"
             >
-                <div v-if="activeTab === 'Overview'" class="grid gap-3">
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="inspector-subtle-card p-3">
-                            <p
-                                class="text-xs font-light text-[var(--inspector-faint)]"
-                            >
-                                Request ID
-                            </p>
-                            <p
-                                class="inspector-code mt-1 text-[var(--inspector-accent)]"
-                            >
-                                #{{ request.id }}
-                            </p>
-                        </div>
-                        <div class="inspector-subtle-card p-3">
-                            <p
-                                class="text-xs font-light text-[var(--inspector-faint)]"
-                            >
-                                Payload state
-                            </p>
-                            <p
-                                class="mt-1 text-sm font-bold text-[var(--inspector-fg)]"
-                            >
-                                {{ parseLabel }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div
-                        v-for="[label, value] in metadata"
-                        :key="label"
-                        class="grid gap-2 border-b border-[var(--inspector-border-soft)] py-2 last:border-b-0 md:grid-cols-[140px_minmax(0,1fr)]"
-                    >
-                        <p
-                            class="text-sm font-light text-[var(--inspector-faint)]"
-                        >
-                            {{ label }}
-                        </p>
-                        <p
-                            class="text-sm break-words text-[var(--inspector-muted)]"
-                            :class="{
-                                'inspector-code': [
-                                    'Captured at',
-                                    'Full URL',
-                                ].includes(label),
-                            }"
-                        >
-                            {{ value }}
-                        </p>
-                    </div>
-                </div>
-
-                <BodyViewer
-                    v-else-if="activeTab === 'Parsed JSON'"
+                <RequestOverview
+                    v-if="activeTab === 'Overview'"
                     :request="request"
-                    mode="body"
                 />
 
                 <HeadersTable
@@ -221,16 +100,42 @@ watch([() => props.request?.id, availableTabs], () => {
                     empty-message="No query parameters were sent."
                 />
 
+                <BodyViewer
+                    v-else-if="activeTab === 'JSON'"
+                    :request="request"
+                    mode="body"
+                />
+
                 <BodyViewer v-else :request="request" mode="raw" />
             </div>
-        </div>
+        </template>
 
-        <div v-else class="p-4">
+        <div
+            v-else
+            class="flex min-h-[520px] flex-1 items-center justify-center p-6"
+        >
             <EmptyState
-                compact
-                title="No request selected"
-                description="Captured requests appear in the list. Select one to inspect headers, query parameters, parsed JSON and the raw body."
-            />
+                bare
+                title="Waiting for your first request"
+                description="Send a request to the endpoint or run the example curl command. Incoming traffic appears automatically while polling is active."
+            >
+                <template #actions>
+                    <CopyButton
+                        v-if="webhookUrl"
+                        :value="webhookUrl"
+                        label="Copy endpoint"
+                        copied-label="Endpoint copied"
+                        variant="primary"
+                    />
+                    <button
+                        type="button"
+                        class="inspector-btn inspector-focus"
+                        @click="emit('openQuickTest')"
+                    >
+                        Show curl
+                    </button>
+                </template>
+            </EmptyState>
         </div>
-    </Panel>
+    </section>
 </template>

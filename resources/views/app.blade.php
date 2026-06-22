@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="dark" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
 
 <head>
     <meta charset="utf-8">
@@ -11,6 +11,12 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <link rel="stylesheet" href="https://use.typekit.net/khx6gnm.css">
+    <script>
+        (() => {
+            const stored = window.localStorage.getItem('webhook-inspector-theme');
+            document.documentElement.dataset.theme = ['dark', 'light'].includes(stored) ? stored : 'dark';
+        })();
+    </script>
 
     @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
     <x-inertia::head>

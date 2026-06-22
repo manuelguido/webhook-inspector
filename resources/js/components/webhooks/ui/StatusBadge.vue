@@ -16,22 +16,22 @@ const props = withDefaults(
 
 const toneClass = computed(() => {
     if (props.tone === 'accent') {
-        return 'border-[rgba(125,211,252,0.35)] bg-[var(--inspector-accent-soft)] text-[var(--inspector-accent)]';
+        return 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]';
     }
 
     if (props.tone === 'success') {
-        return 'border-[rgba(116,231,164,0.35)] bg-[var(--inspector-green-soft)] text-[var(--inspector-green)]';
+        return 'border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]';
     }
 
     if (props.tone === 'warning') {
-        return 'border-[rgba(247,198,111,0.38)] bg-[var(--inspector-amber-soft)] text-[var(--inspector-amber)]';
+        return 'border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]';
     }
 
     if (props.tone === 'danger') {
-        return 'border-[rgba(255,143,143,0.36)] bg-[var(--inspector-red-soft)] text-[var(--inspector-red)]';
+        return 'border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]';
     }
 
-    return 'border-[var(--inspector-border)] bg-[rgba(255,255,255,0.025)] text-[var(--inspector-muted)]';
+    return 'border-[var(--border-default)] bg-[var(--surface)] text-[var(--text-secondary)]';
 });
 </script>
 
