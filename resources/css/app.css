@@ -402,6 +402,10 @@ body {
     box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.request-row.request-arrived:not([aria-selected='true']) {
+    animation: request-arrived 1.2s ease-out 1;
+}
+
 .workbench-drawer-backdrop {
     background: rgba(6, 10, 16, 0.48);
 }
@@ -461,5 +465,15 @@ body {
 @keyframes inspector-shimmer {
     100% {
         transform: translateX(100%);
+    }
+}
+
+@keyframes request-arrived {
+    from {
+        background-color: var(--accent-soft);
+    }
+
+    to {
+        background-color: transparent;
     }
 }
